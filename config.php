@@ -94,6 +94,7 @@ FPP Remote Monitoring Connected
 <div class="container-fluid settingsTable settingsGroupTable">    
 <?
 $arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSystems"), true);
+$origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
     foreach ($arr["systems"] as $i) {
         echo "<div class='row'>";
@@ -101,10 +102,19 @@ if (array_key_exists("systems", $arr)) {
         if ($i["typeId"] >= 1 && $i["typeId"] < 128) {
             PrintSettingCheckbox($i["hostname"] . "-" .  $i["address"], "FPPMon_" . $i["address"], 1, 0, 1, 0, "fpp-FPPMon", "", 0);
             echo "&nbsp;" . $i["hostname"] . "/" .  $i["address"];
+            unset($origSystemSettings["FPPMon_" . $i["address"]]);
         }
         echo "</div>";
     }
-    ksort($backupHosts);
+    foreach ($origSystemSettings as $key => $i) {
+        if ($i == "1") {
+            echo "<div class='row'>";
+            $ip = substr($key, 7);
+            PrintSettingCheckbox($ip, $key, 1, 0, 1, 0, "fpp-FPPMon", "", 0);
+            echo "&nbsp;" . $ip . " (not found)";
+            echo "</div>";
+        }
+    }
 }
 ?>
 </div>
