@@ -3,9 +3,9 @@
 	"name": "FPP Remote Monitoring Plugin",
 	"author": "Daniel Kulp (dkulp)",
 	"description": "This plugin allows remote monitoring of FPP instances.",
-	"homeURL": "https://github.com/FalconChristmas/fpp-FPPMon",
-	"srcURL": "https://github.com/FalconChristmas/fpp-FPPMon.git",
-	"bugURL": "https://github.com/FalconChristmas/fpp-FPPMon/issues",
+	"homeURL": "https://github.com/KulpLights/fpp-FPPMon",
+	"srcURL": "https://github.com/KulpLights/fpp-FPPMon.git",
+	"bugURL": "https://github.com/KulpLights/fpp-FPPMon/issues",
 	"allowUpdates": 1,
 	"versions": [
         {
