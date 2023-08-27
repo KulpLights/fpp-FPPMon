@@ -16,7 +16,8 @@ function CheckStatus() {
                 html += data["email"] + "<br><br>";
                 html += "Subscription:<br>";
                 html += data["maxFPP"] + " FPP Instances<br>";
-                html += data["maxKulp"] + " KulpLights Controllers<br></div>";
+                html += data["maxKulp"] + " KulpLights Controllers<br>";
+                html += "<div><input type='button' class='buttons buttons-rounded' value='Logout' onclick='LogoutFromKulpLights()''></div></div>";
                 $("#userInfoDiv").html(html);
                 $("#userInfoDiv").show();
                 $("#loginDiv").hide();
@@ -62,7 +63,15 @@ function SaveCredentials(data) {
     });
 
 }
+function LogoutFromKulpLights() {
+    var data = new Object();
+    data['data'] = new Object();
+    data['data']['nicename'] = "";
+    data['data']['token'] = "";
+    data['data']['refresh_token'] = "";
 
+    SaveCredentials(data);
+}
 function LoginToKulpLights() {
     var un = $("#klusername").val();
     var pwd = $("#klpassword").val();
@@ -95,6 +104,7 @@ $(document).ready(function() {CheckStatus();});
 <div id="global" class="settings">
 <h2>FPP Remote Monitoring Plugin</h2>
 <div class="container-fluid settingsTable settingsGroupTable" id="loginDiv">
+<div class="row"><div class="col-5">Login with your <a href="https://kulplights.com">KulpLights</a> account credentials</div></div>
 <div class="row"><div class="printSettingLabelCol description col-1">Username:</div><div class="col-1"><input type='text' id='klusername'></div></div>
 <div class="row"><div class="printSettingLabelCol description col-1">Password:</div><div class="col-1"><input type='password' id='klpassword'></div></div>
 <div class="row"><div class="col-1"></div><div class="col-1"><input type='button' class='buttons buttons-rounded' value="Login" onclick="LoginToKulpLights()"></div></div>
@@ -110,6 +120,7 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 </div>
 <br>
 <div class="container-fluid settingsTable settingsGroupTable">    
+    <div class="row">Select FPP Instances to Monitor:</div>
 <?
 $arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSystems"), true);
 $origSystemSettings = $pluginSettings;
@@ -135,5 +146,8 @@ if (array_key_exists("systems", $arr)) {
     }
 }
 ?>
+</div>
+<div>
+    Please log any bugs/issues/suggestions at <a href="https://github.com/KulpLights/fpp-FPPMon/issues">https://github.com/KulpLights/fpp-FPPMon/issues</a>
 </div>
 </div>
