@@ -108,11 +108,20 @@ $(document).ready(function() {CheckStatus();});
 <div class="row"><div class="printSettingLabelCol description col-1">Username:</div><div class="col-1"><input type='text' id='klusername'></div></div>
 <div class="row"><div class="printSettingLabelCol description col-1">Password:</div><div class="col-1"><input type='password' id='klpassword'></div></div>
 <div class="row"><div class="col-1"></div><div class="col-1"><input type='button' class='buttons buttons-rounded' value="Login" onclick="LoginToKulpLights()"></div></div>
+<div class="col-1">
+    <a href="https://apps.apple.com/us/app/fppmon/id6445864655"><img alt='Get it in the App Store' src="images/plugin/fpp-FPPMon/images/AppleAppStore.png" width="150"></a>
+    <a href="https://play.google.com/store/apps/details?id=com.kulplights.fppmon"><img alt='Get it on Google Play' src="images/plugin/fpp-FPPMon/images/google-play-badge.png" width="150"></a>
+</div>
 </div>
 <div class="container-fluid" id="connectedDiv">
 FPP Remote Monitoring Connected<br>
 <div class=" row">
 <div class="backdrop col-auto" id="userInfoDiv"></div>
+<div class="col-1"></div>
+<div class="col-1">
+    <a href="https://apps.apple.com/us/app/fppmon/id6445864655"><img alt='Get it in the App Store' src="images/plugin/fpp-FPPMon/images/AppleAppStore.png" width="150"></a><br>
+    <a href="https://play.google.com/store/apps/details?id=com.kulplights.fppmon"><img alt='Get it on Google Play' src="images/plugin/fpp-FPPMon/images/google-play-badge.png" width="150"></a><br>
+</div>
 </div>
 </div>
 <div class="container-fluid settingsTable settingsGroupTable" id="notRunningDiv">
