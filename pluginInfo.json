@@ -1,6 +1,6 @@
 {
 	"repoName": "fpp-FPPMon",
-	"name": "FPP Remote Monitoring Plugin",
+	"name": "FPP Remote Monitoring Plugin (FPPMon)",
 	"author": "Daniel Kulp (dkulp)",
 	"description": "This plugin allows remote monitoring of FPP instances.",
 	"homeURL": "https://github.com/KulpLights/fpp-FPPMon",
