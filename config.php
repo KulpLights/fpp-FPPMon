@@ -17,12 +17,17 @@ function CheckStatus() {
                 html += "Subscription:<br>";
                 html += data["maxFPP"] + " FPP Instances<br>";
                 html += data["maxKulp"] + " KulpLights Controllers<br>";
+                html += data["maxOther"] + " Non FPP Controllers<br>";
                 html += "<div><input type='button' class='buttons buttons-rounded' value='Logout' onclick='LogoutFromKulpLights()''></div></div>";
                 $("#userInfoDiv").html(html);
                 $("#userInfoDiv").show();
                 $("#loginDiv").hide();
                 $("#connectedDiv").show();
                 $("#notRunningDiv").hide();
+
+                if (data["maxOther"] == 0) {
+                    $(".otherControllerType").hide();
+                }
             } else {
                 $("#loginDiv").show();
                 $("#userInfoDiv").hide();
@@ -129,20 +134,24 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 </div>
 <br>
 <div class="container-fluid settingsTable settingsGroupTable">    
-    <div class="row">Select FPP Instances to Monitor:</div>
+    <div class="row">Select FPP Instances and Controllers to Monitor:</div>
 <?
 $arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSystems"), true);
 $origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
     foreach ($arr["systems"] as $i) {
-        echo "<div class='row'>";
         // FPP Systems are 0x01 to 0x80
-        if ($i["typeId"] >= 1 && $i["typeId"] < 128) {
+        if ($i["typeId"] >= 1 && $i["typeId"] <= 0x90) {
+            if ($i["typeId"] < 0x80) {
+                echo "<div class='row'>";
+            } else if ($i["typeId"] <= 0x91) {
+                echo "<div class='row otherControllerType'>";
+            }
             PrintSettingCheckbox($i["hostname"] . "-" .  $i["address"], "FPPMon_" . $i["address"], 1, 0, 1, 0, "fpp-FPPMon", "", 0);
             echo "&nbsp;" . $i["hostname"] . "/" .  $i["address"];
             unset($origSystemSettings["FPPMon_" . $i["address"]]);
+            echo "</div>";
         }
-        echo "</div>";
     }
     foreach ($origSystemSettings as $key => $i) {
         if ($i == "1") {
