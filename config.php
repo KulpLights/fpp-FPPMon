@@ -141,10 +141,10 @@ $origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
     foreach ($arr["systems"] as $i) {
         // FPP Systems are 0x01 to 0x80
-        if ($i["typeId"] >= 1 && $i["typeId"] <= 0x90) {
+        if ($i["typeId"] >= 1 && $i["typeId"] < 0xC0) {
             if ($i["typeId"] < 0x80) {
                 echo "<div class='row'>";
-            } else if ($i["typeId"] <= 0x91) {
+            } else if ($i["typeId"] < 0xC0) {
                 echo "<div class='row otherControllerType'>";
             }
             PrintSettingCheckbox($i["hostname"] . "-" .  $i["address"], "FPPMon_" . $i["address"], 1, 0, 1, 0, "fpp-FPPMon", "", 0);
