@@ -7,13 +7,15 @@ for var in "$@"
 do
 	case $var in
 		-l|--list)
-            env > /root/env.txt
+                rm -f ${BASEDIR}/libfpp-FPPMon.so
             if [[ $FPPPLATFORM == "Raspberry Pi" ]]; then
                 cp -f ${BASEDIR}/lib/libfpp-FPPMon-Pi.so ${BASEDIR}/libfpp-FPPMon.so
             elif [[ $FPPPLATFORM == "BeagleBone Black" ]]; then
                 cp -f ${BASEDIR}/lib/libfpp-FPPMon-BBB.so ${BASEDIR}/libfpp-FPPMon.so
+	    elif [[ $FPPPLATFORM == "BeagleBone 64" ]]; then
+                cp -f ${BASEDIR}/lib/libfpp-FPPMon-BB64.so ${BASEDIR}/libfpp-FPPMon.so
             fi
-			echo "c++";
+   	echo "c++";
             exit 0;
 		;;
 		-h|--help)
