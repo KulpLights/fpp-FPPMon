@@ -7,15 +7,9 @@ for var in "$@"
 do
 	case $var in
 		-l|--list)
-                rm -f ${BASEDIR}/libfpp-FPPMon.so
-            if [[ $FPPPLATFORM == "Raspberry Pi" ]]; then
-                cp -f ${BASEDIR}/lib/libfpp-FPPMon-Pi.so ${BASEDIR}/libfpp-FPPMon.so
-            elif [[ $FPPPLATFORM == "BeagleBone Black" ]]; then
-                cp -f ${BASEDIR}/lib/libfpp-FPPMon-BBB.so ${BASEDIR}/libfpp-FPPMon.so
-	    elif [[ $FPPPLATFORM == "BeagleBone 64" ]]; then
-                cp -f ${BASEDIR}/lib/libfpp-FPPMon-BB64.so ${BASEDIR}/libfpp-FPPMon.so
-            fi
-   	echo "c++";
+            # The platform/version-matched libfpp-FPPMon.so is provisioned by
+            # scripts/fpp_install.sh (install) and scripts/preStart.sh (boot).
+            echo "c++";
             exit 0;
 		;;
 		-h|--help)

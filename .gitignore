@@ -1,1 +1,3 @@
 libfpp-FPPMon.so
+*.so.gz
+.binary-major
