@@ -27,26 +27,50 @@ REPO_URL="https://github.com/KulpLights/fpp-FPPMon"
 TARGET="${BASEDIR}/libfpp-FPPMon.so"
 MARKER="${BASEDIR}/.binary-major"
 
-# --- Platform: $FPPPLATFORM can't tell Pi from Pi64, so check the arch -------
+# Determine whether the installed FPP is 64-bit. NOTE: `uname -m` is NOT
+# reliable for this on a Pi 4/5 -- those boot a 64-bit kernel even under a
+# 32-bit FPP, so `uname -m` reports "aarch64" for what is really an armhf
+# userspace. Instead read the ELF class of an actual FPP binary (the exact ABI
+# the plugin must match): byte 5 of the ELF header is 2 for 64-bit, 1 for
+# 32-bit. Fall back to getconf/uname only if no FPP binary is readable.
+fpp_is_64bit() {
+    _f=""
+    for _c in "${FPPDIR}/src/fppd" "${FPPDIR}/src/libfpp.so"; do
+        [ -r "${_c}" ] && { _f="${_c}"; break; }
+    done
+    if [ -n "${_f}" ]; then
+        case "$(od -An -t u1 -j4 -N1 "${_f}" 2>/dev/null | tr -d '[:space:]')" in
+            2) return 0 ;;   # ELFCLASS64
+            1) return 1 ;;   # ELFCLASS32
+        esac
+    fi
+    if command -v getconf >/dev/null 2>&1; then
+        [ "$(getconf LONG_BIT 2>/dev/null)" = "64" ]
+        return $?
+    fi
+    [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "x86_64" ]
+}
+
+# --- Platform: $FPPPLATFORM can't tell Pi from Pi64, so check the bitness -----
 ARCH="$(uname -m)"
 case "${FPPPLATFORM}" in
     "Raspberry Pi")
-        if [ "${ARCH}" = "aarch64" ]; then PLAT="Pi64"; else PLAT="Pi"; fi
+        if fpp_is_64bit; then PLAT="Pi64"; else PLAT="Pi"; fi
         ;;
     "BeagleBone 64")     PLAT="BB64" ;;
     "BeagleBone Black")  PLAT="BBB" ;;
     *)
         # Generic installs (Armbian/Debian/Ubuntu/etc.) -- key off the
         # architecture. (Pi64/BB64 are also aarch64 but are matched above by
-        # $FPPPLATFORM, so this only catches non-Pi/BB arm64 hardware.)
-        case "${ARCH}" in
-            x86_64)  PLAT="x86_64" ;;
-            aarch64) PLAT="aarch64" ;;
-            *)
-                echo "fpp-FPPMon: unsupported platform '${FPPPLATFORM}' (${ARCH}), skipping binary download" >&2
-                exit 0
-                ;;
-        esac
+        # $FPPPLATFORM, so this only catches non-Pi/BB hardware.)
+        if [ "${ARCH}" = "x86_64" ]; then
+            PLAT="x86_64"
+        elif fpp_is_64bit; then
+            PLAT="aarch64"
+        else
+            echo "fpp-FPPMon: unsupported platform '${FPPPLATFORM}' (${ARCH}), skipping binary download" >&2
+            exit 0
+        fi
         ;;
 esac
 
