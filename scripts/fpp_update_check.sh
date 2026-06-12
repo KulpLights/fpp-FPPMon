@@ -32,6 +32,14 @@ if [ -z "${REMOTE}" ]; then
     exit 0
 fi
 
+if [ -s "${SO}" ] && [ ! -r "${SO}" ]; then
+    # Present but unreadable by this user (e.g. a pre-fix 0600 download):
+    # we can't tell what build it is, so don't report a false update.
+    echo "fpp-FPPMon: ${SO} is not readable, cannot determine installed build"
+    echo "0"
+    exit 0
+fi
+
 LOCAL=""
 if [ -s "${SO}" ]; then
     LOCAL="$(strings "${SO}" 2>/dev/null | sed -n 's/^FPPMon-build://p' | head -1)"

@@ -107,7 +107,12 @@ if ! gunzip -f "${TMP}"; then
 fi
 
 # Atomically replace the live .so and record which major it was built for.
+# mktemp creates the temp file 0600 and mv preserves that mode, which left
+# the .so readable only by root -- breaking non-root tooling like the
+# update-check script the web UI runs. Open both files up explicitly.
+chmod 644 "${TMP%.gz}"
 mv -f "${TMP%.gz}" "${TARGET}"
 echo "${MAJ}" > "${MARKER}"
+chmod 644 "${MARKER}"
 trap - EXIT
 echo "fpp-FPPMon: installed ${PLAT} binary for FPP ${MAJ}"
