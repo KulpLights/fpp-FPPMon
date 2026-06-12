@@ -11,6 +11,9 @@ function CheckStatus() {
         dataType: 'json',
         async: false,
         success: function (data) {
+            if (data['pluginVersion']) {
+                $("#pluginVersionDiv").text("Plugin build: " + data['pluginVersion']);
+            }
             if (data['status'] == "Connected") {
                 var html = "<div><b>" + data["name"] + "</b><br>";
                 html += data["email"] + "<br><br>";
@@ -140,11 +143,13 @@ $arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSyste
 $origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
     foreach ($arr["systems"] as $i) {
-        // FPP Systems are 0x01 to 0x80
-        if ($i["typeId"] >= 1 && $i["typeId"] < 0xC0) {
+        // FPP Systems are 0x01 to 0x80; 0x80-0xBF are Falcon/Genius hardware
+        // controllers; 0xFB is WLED. The rest of the 0xC0+ range is gear the
+        // plugin can't monitor.
+        if (($i["typeId"] >= 1 && $i["typeId"] < 0xC0) || $i["typeId"] == 0xFB) {
             if ($i["typeId"] < 0x80) {
                 echo "<div class='row'>";
-            } else if ($i["typeId"] < 0xC0) {
+            } else {
                 echo "<div class='row otherControllerType'>";
             }
             PrintSettingCheckbox($i["hostname"] . "-" .  $i["address"], "FPPMon_" . $i["address"], 1, 0, 1, 0, "fpp-FPPMon", "", 0);
@@ -168,4 +173,5 @@ if (array_key_exists("systems", $arr)) {
 <div>
     Please log any bugs/issues/suggestions at <a href="https://github.com/KulpLights/fpp-FPPMon/issues">https://github.com/KulpLights/fpp-FPPMon/issues</a>
 </div>
+<div id="pluginVersionDiv" class="text-muted"></div>
 </div>
