@@ -6,6 +6,7 @@
 	"homeURL": "https://github.com/KulpLights/fpp-FPPMon",
 	"srcURL": "https://github.com/KulpLights/fpp-FPPMon.git",
 	"bugURL": "https://github.com/KulpLights/fpp-FPPMon/issues",
+	"iconURL": "https://raw.githubusercontent.com/KulpLights/fpp-FPPMon/master/icon.png",
 	"allowUpdates": 1,
 	"versions": [
         {
