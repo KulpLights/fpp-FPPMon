@@ -8,9 +8,17 @@
 # repo, e.g.  releases/download/fpp10/libfpp-FPPMon-Pi64-10.so.gz
 #
 # This is sourced/run both at install time (fpp_install.sh) and on every boot
-# (preStart.sh). The boot run re-fetches when the .so is missing or was built
-# for a different FPP major than is now running -- which happens after an FPP
-# OS upgrade carries the old plugin dir forward.
+# (preStart.sh). The boot run re-fetches when the .so is missing or no longer
+# matches the running FPP -- which happens after an FPP OS upgrade carries the
+# old plugin dir forward.
+#
+# "Matches" is the FPP major AND the plugin ABI version (FPP_PLUGIN_API_VERSION
+# in FPP's Plugin.h). The major alone is not enough: FPP bumps the ABI version
+# *within* a major when it changes the layout of a type plugins construct, and
+# fppd then refuses to load a binary built against the older value. Keying the
+# marker on the major only meant such a box saw "already present", never
+# re-fetched, and stayed broken forever -- exactly the situation the FPP 10
+# 3 -> 4 bump created for every installed FPPMon binary.
 #############################################################################
 
 # BASEDIR = the plugin directory (one level up from this script).
@@ -25,6 +33,10 @@ fi
 
 REPO_URL="https://github.com/KulpLights/fpp-FPPMon"
 TARGET="${BASEDIR}/libfpp-FPPMon.so"
+# Records what the installed .so was built for, as "<major>" on FPP releases
+# that predate the plugin ABI version, or "<major>.<abi>" where it exists. The
+# filename is historical; an install written by an older version of this script
+# holds a bare major, which simply fails to match and triggers one re-fetch.
 MARKER="${BASEDIR}/.binary-major"
 
 # Determine whether the installed FPP is 64-bit. NOTE: `uname -m` is NOT
@@ -82,9 +94,23 @@ if [ -z "${MAJ}" ]; then
     exit 1
 fi
 
+# --- Plugin ABI version (absent on FPP releases predating the mechanism) ------
+# fppd refuses to load a plugin whose FPP_PLUGIN_API_VERSION differs from its
+# own, so this has to be part of the "is the installed binary still good?" test.
+PLUGINHDR="${FPPDIR}/src/Plugin.h"
+ABI="$(sed -nE 's/^#define[[:space:]]+FPP_PLUGIN_API_VERSION[[:space:]]+([0-9]+).*/\1/p' "${PLUGINHDR}" 2>/dev/null | head -1)"
+if [ -n "${ABI}" ]; then
+    KEY="${MAJ}.${ABI}"
+    DESC="FPP ${MAJ} (plugin ABI ${ABI})"
+else
+    # Older FPP with no version gate; major alone is the best signal available.
+    KEY="${MAJ}"
+    DESC="FPP ${MAJ}"
+fi
+
 # --- Skip if we already have the right binary --------------------------------
-if [ -s "${TARGET}" ] && [ "$(cat "${MARKER}" 2>/dev/null)" = "${MAJ}" ]; then
-    echo "fpp-FPPMon: ${PLAT} binary for FPP ${MAJ} already present"
+if [ -s "${TARGET}" ] && [ "$(cat "${MARKER}" 2>/dev/null)" = "${KEY}" ]; then
+    echo "fpp-FPPMon: ${PLAT} binary for ${DESC} already present"
     exit 0
 fi
 
@@ -112,7 +138,7 @@ fi
 # update-check script the web UI runs. Open both files up explicitly.
 chmod 644 "${TMP%.gz}"
 mv -f "${TMP%.gz}" "${TARGET}"
-echo "${MAJ}" > "${MARKER}"
+echo "${KEY}" > "${MARKER}"
 chmod 644 "${MARKER}"
 trap - EXIT
-echo "fpp-FPPMon: installed ${PLAT} binary for FPP ${MAJ}"
+echo "fpp-FPPMon: installed ${PLAT} binary for ${DESC}"
