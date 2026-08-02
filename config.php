@@ -146,19 +146,70 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 $arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSystems"), true);
 $origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
+    // MultiSync advertises every interface address, so one box shows up once
+    // per interface (two LANs + loopback + IPv6 can be four rows). Collapse
+    // rows sharing a uuid into one entry. Preferences within a group: an
+    // address the user already selected always renders (an existing selection
+    // must never turn into a hidden checkbox plus a second unchecked row),
+    // otherwise IPv4 beats IPv6 beats loopback, ties broken by discovery
+    // order. Rows without a usable uuid (hardware controllers, old FPP) are
+    // not grouped at all -- keying those on hostname could wrongly merge two
+    // identically-named controllers.
+    $groups = array();
+    $order = array();
     foreach ($arr["systems"] as $i) {
         // FPP Systems are 0x01 to 0x80; 0x80-0xBF are Falcon/Genius hardware
         // controllers; 0xFB is WLED. The rest of the 0xC0+ range is gear the
         // plugin can't monitor.
         if (($i["typeId"] >= 1 && $i["typeId"] < 0xC0) || $i["typeId"] == 0xFB) {
+            $uuid = isset($i["uuid"]) ? $i["uuid"] : "";
+            $key = ($uuid != "" && $uuid != "Unknown") ? "u:" . $uuid : "a:" . $i["address"];
+            if (!isset($groups[$key])) {
+                $groups[$key] = array();
+                $order[] = $key;
+            }
+            $groups[$key][] = $i;
+        }
+    }
+    foreach ($order as $key) {
+        $bestAddr = "";
+        $bestScore = 99;
+        foreach ($groups[$key] as $i) {
+            $addr = $i["address"];
+            // Every address of the group counts as "seen" so none of them
+            // lands in the (not found) leftovers below.
+            unset($origSystemSettings["FPPMon_" . $addr]);
+            $selected = isset($pluginSettings["FPPMon_" . $addr]) && $pluginSettings["FPPMon_" . $addr] == "1";
+            if ($selected) {
+                $score = 0;
+            } else if ($addr == "127.0.0.1" || $addr == "::1") {
+                $score = 3;
+            } else if (strpos($addr, ':') !== false) {
+                $score = 2;
+            } else {
+                $score = 1;
+            }
+            if ($score < $bestScore) {
+                $bestScore = $score;
+                $bestAddr = $addr;
+            }
+        }
+        foreach ($groups[$key] as $i) {
+            $addr = $i["address"];
+            $selected = isset($pluginSettings["FPPMon_" . $addr]) && $pluginSettings["FPPMon_" . $addr] == "1";
+            // Render the preferred row, plus any *other* rows the user has
+            // selected (both checked, so a redundant selection stays visible
+            // and can be cleared); hide only unselected duplicates.
+            if ($addr != $bestAddr && !$selected) {
+                continue;
+            }
             if ($i["typeId"] < 0x80) {
                 echo "<div class='row'>";
             } else {
                 echo "<div class='row otherControllerType'>";
             }
-            PrintSettingCheckbox($i["hostname"] . "-" .  $i["address"], "FPPMon_" . $i["address"], 1, 0, 1, 0, "fpp-FPPMon", "", 0);
-            echo "&nbsp;" . $i["hostname"] . "/" .  $i["address"];
-            unset($origSystemSettings["FPPMon_" . $i["address"]]);
+            PrintSettingCheckbox($i["hostname"] . "-" .  $addr, "FPPMon_" . $addr, 1, 0, 1, 0, "fpp-FPPMon", "", 0);
+            echo "&nbsp;" . $i["hostname"] . "/" .  $addr;
             echo "</div>";
         }
     }
