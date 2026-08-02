@@ -121,7 +121,12 @@ SUMSURL="${REPO_URL}/releases/download/fpp${MAJ}/checksums.txt"
 echo "fpp-FPPMon: downloading ${ASSET} ..."
 
 TMP="$(mktemp "${BASEDIR}/.fpp-FPPMon.XXXXXX.gz")"
-SUMS="${TMP%.gz}.sums"
+# The download has to land in BASEDIR so the final mv onto the .so is a
+# same-filesystem rename, but the checksum list is not an install artifact and
+# has no such constraint. Keep it out of the plugin directory: that directory
+# is a git working tree, so anything left there shows up as untracked cruft
+# and gets swept by the plugin manager on the next upgrade.
+SUMS="$(mktemp "${TMPDIR:-/tmp}/fpp-FPPMon.XXXXXX.sums")"
 trap 'rm -f "${TMP}" "${TMP%.gz}" "${SUMS}"' EXIT
 
 sha256_of() {
@@ -192,5 +197,9 @@ chmod 644 "${TMP%.gz}"
 mv -f "${TMP%.gz}" "${TARGET}"
 echo "${KEY}" > "${MARKER}"
 chmod 644 "${MARKER}"
-trap - EXIT
+# Deliberately leave the EXIT trap armed: it is the only thing that removes
+# the checksum file, and clearing it here (as this did) leaked one temp file
+# per successful download. Everything it removes is either already consumed
+# or scratch, so letting it fire on the success path is a no-op plus that
+# cleanup -- and no future early return can leak either.
 echo "fpp-FPPMon: installed ${PLAT} binary for ${DESC}"
