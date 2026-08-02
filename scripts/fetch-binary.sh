@@ -31,7 +31,8 @@ if [ -f "${FPPDIR}/scripts/common" ]; then
     . "${FPPDIR}/scripts/common"
 fi
 
-REPO_URL="https://github.com/KulpLights/fpp-FPPMon"
+# Overridable so the download/verify path can be tested against a local server.
+REPO_URL="${FPPMON_REPO_URL:-https://github.com/KulpLights/fpp-FPPMon}"
 TARGET="${BASEDIR}/libfpp-FPPMon.so"
 # Records what the installed .so was built for, as "<major>" on FPP releases
 # that predate the plugin ABI version, or "<major>.<abi>" where it exists. The
@@ -116,16 +117,67 @@ fi
 
 ASSET="libfpp-FPPMon-${PLAT}-${MAJ}.so.gz"
 URL="${REPO_URL}/releases/download/fpp${MAJ}/${ASSET}"
+SUMSURL="${REPO_URL}/releases/download/fpp${MAJ}/checksums.txt"
 echo "fpp-FPPMon: downloading ${ASSET} ..."
 
 TMP="$(mktemp "${BASEDIR}/.fpp-FPPMon.XXXXXX.gz")"
-trap 'rm -f "${TMP}" "${TMP%.gz}"' EXIT
+SUMS="${TMP%.gz}.sums"
+trap 'rm -f "${TMP}" "${TMP%.gz}" "${SUMS}"' EXIT
 
-if ! curl -fSL --retry 3 -o "${TMP}" "${URL}"; then
-    echo "fpp-FPPMon: ERROR downloading ${URL}" >&2
-    echo "fpp-FPPMon: no binary available for ${PLAT} on FPP ${MAJ}." >&2
-    exit 1
-fi
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1
+    fi
+}
+
+# Verify the downloaded archive against the release's checksums.txt before it
+# can replace the installed .so, so a truncated or corrupted download can't
+# take out a working install. CI uploads the binaries and checksums.txt as
+# separate assets, so a fetch that lands mid-publish can see a mismatched
+# pair; one re-fetch of both resolves that, and a mismatch that survives the
+# retry is fatal. A release with no checksums.txt (predates the mechanism)
+# verifies nothing -- same trust as before, so proceed with a note.
+VERIFY="pending"
+for ATTEMPT in 1 2; do
+    if ! curl -fSL --retry 3 -o "${TMP}" "${URL}"; then
+        echo "fpp-FPPMon: ERROR downloading ${URL}" >&2
+        echo "fpp-FPPMon: no binary available for ${PLAT} on FPP ${MAJ}." >&2
+        exit 1
+    fi
+    if ! curl -fsL --retry 3 -o "${SUMS}" "${SUMSURL}"; then
+        VERIFY="no-checksums"
+        break
+    fi
+    EXPECTED="$(awk -v a="${ASSET}" '$2 == a { print tolower($1); exit }' "${SUMS}")"
+    if [ -z "${EXPECTED}" ]; then
+        VERIFY="unlisted"
+        break
+    fi
+    ACTUAL="$(sha256_of "${TMP}")"
+    if [ -z "${ACTUAL}" ]; then
+        VERIFY="no-tool"
+        break
+    fi
+    if [ "${ACTUAL}" = "${EXPECTED}" ]; then
+        VERIFY="ok"
+        break
+    fi
+    VERIFY="mismatch"
+    [ "${ATTEMPT}" = "1" ] && echo "fpp-FPPMon: checksum mismatch for ${ASSET}, re-fetching ..." >&2
+done
+case "${VERIFY}" in
+    ok)           echo "fpp-FPPMon: checksum verified for ${ASSET}" ;;
+    no-checksums) echo "fpp-FPPMon: release fpp${MAJ} has no checksums.txt, skipping verification" ;;
+    unlisted)     echo "fpp-FPPMon: WARNING: ${ASSET} not listed in checksums.txt, skipping verification" >&2 ;;
+    no-tool)      echo "fpp-FPPMon: WARNING: no sha256 tool available, skipping verification" >&2 ;;
+    *)
+        echo "fpp-FPPMon: ERROR: checksum mismatch for ${ASSET}; keeping the installed binary." >&2
+        echo "fpp-FPPMon: (a release may be mid-publish -- retry in a few minutes)" >&2
+        exit 1
+        ;;
+esac
 
 if ! gunzip -f "${TMP}"; then
     echo "fpp-FPPMon: ERROR decompressing ${ASSET}" >&2
