@@ -174,6 +174,21 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 // Via the web server's documented proxy, not fppd's internal port directly.
 $arr = json_decode(file_get_contents("http://localhost/api/fppd/multiSyncSystems"), true);
 $origSystemSettings = $pluginSettings;
+
+// Ask the running plugin whether it picks a changed selection up on its own.
+// It does from the build that advertises liveSystemSelection; an older .so --
+// or none loaded at all -- answers without the flag, and those still need an
+// fppd restart, so keep asking for one in that case. Short timeout: this is on
+// the page's critical path, and localhost either answers at once or is down.
+$restartOnChange = 1;
+$ctx = stream_context_create(array('http' => array('timeout' => 2, 'ignore_errors' => true)));
+$pluginStatus = @file_get_contents("http://localhost/api/plugin-apis/FPPMon", false, $ctx);
+if ($pluginStatus !== false) {
+    $ps = json_decode($pluginStatus, true);
+    if (is_array($ps) && !empty($ps["liveSystemSelection"])) {
+        $restartOnChange = 0;
+    }
+}
 if (array_key_exists("systems", $arr)) {
     // MultiSync advertises every interface address, so one box shows up once
     // per interface (two LANs + loopback + IPv6 can be four rows). Collapse
@@ -237,7 +252,7 @@ if (array_key_exists("systems", $arr)) {
             } else {
                 echo "<div class='row otherControllerType'>";
             }
-            PrintSettingCheckbox($i["hostname"] . "-" .  $addr, "FPPMon_" . $addr, 1, 0, 1, 0, "fpp-FPPMon", "", 0);
+            PrintSettingCheckbox($i["hostname"] . "-" .  $addr, "FPPMon_" . $addr, $restartOnChange, 0, 1, 0, "fpp-FPPMon", "", 0);
             echo "&nbsp;" . $i["hostname"] . "/" .  $addr;
             echo "</div>";
         }
@@ -246,7 +261,7 @@ if (array_key_exists("systems", $arr)) {
         if ($i == "1") {
             echo "<div class='row'>";
             $ip = substr($key, 7);
-            PrintSettingCheckbox($ip, $key, 1, 0, 1, 0, "fpp-FPPMon", "", 0);
+            PrintSettingCheckbox($ip, $key, $restartOnChange, 0, 1, 0, "fpp-FPPMon", "", 0);
             echo "&nbsp;" . $ip . " (not found)";
             echo "</div>";
         }
