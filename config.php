@@ -60,16 +60,44 @@ function SaveCredentials(data) {
         contentType: 'application/json',
         data:  JSON.stringify(creds, null, 2),
         success: function (data) {
-            SetRestartFlag(2);
-            RestartFPPD();
-            CheckStatus();
-            location.reload();
+            // The plugin applies the new credentials as soon as this POST
+            // lands (it re-runs its connection to the monitoring service), so
+            // no fppd restart is needed here -- and restarting fppd from a
+            // settings page would kill a running show.
+            if (creds['username'] == "") {
+                location.reload();  // logout settles immediately
+                return;
+            }
+            $('html,body').css('cursor', 'wait');
+            ReloadWhenSettled(12);
         },
         error: function () {
             location.reload();
         }
     });
 
+}
+// Connecting takes a couple of seconds, so reload only once the plugin reports
+// a state that won't change on its own -- reloading immediately would redraw
+// the login form and make a successful login look like it failed.
+function ReloadWhenSettled(triesLeft) {
+    $.ajax({
+        url: "api/plugin-apis/FPPMon",
+        type: "GET",
+        dataType: 'json',
+        success: function (data) {
+            var status = data['status'];
+            if (triesLeft <= 0 || status == "Connected" ||
+                status == "Invalid Credentials" || status == "No Credentials") {
+                location.reload();
+            } else {
+                setTimeout(function () { ReloadWhenSettled(triesLeft - 1); }, 1000);
+            }
+        },
+        error: function () {
+            location.reload();
+        }
+    });
 }
 function LogoutFromKulpLights() {
     var data = new Object();
@@ -143,7 +171,8 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 <div class="container-fluid settingsTable settingsGroupTable">    
     <div class="row">Select FPP Instances and Controllers to Monitor:</div>
 <?
-$arr = json_decode(file_get_contents("http://localhost:32322/fppd/multiSyncSystems"), true);
+// Via the web server's documented proxy, not fppd's internal port directly.
+$arr = json_decode(file_get_contents("http://localhost/api/fppd/multiSyncSystems"), true);
 $origSystemSettings = $pluginSettings;
 if (array_key_exists("systems", $arr)) {
     // MultiSync advertises every interface address, so one box shows up once
