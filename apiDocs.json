@@ -1,0 +1,131 @@
+{
+    "paths": {
+        "/FPPMon": {
+            "get": {
+                "summary": "FPPMon account and connection status",
+                "description": "Reports whether this player is connected to the FPPMon service, which account it is signed in as, and the plan limits that account carries. This is what the plugin's configuration page reads to render its status; it is not part of the FPPMon app protocol, which runs over MQTT.",
+                "responses": {
+                    "200": {
+                        "description": "Current status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "description": "Connection state, e.g. Connected or Not Logged In"
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Display name of the signed-in account"
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "description": "Email address of the signed-in account"
+                                        },
+                                        "pluginVersion": {
+                                            "type": "string",
+                                            "description": "Plugin build, as date and commit"
+                                        },
+                                        "liveSystemSelection": {
+                                            "type": "boolean",
+                                            "description": "Whether systems can be selected without restarting fppd"
+                                        },
+                                        "maxFPP": {
+                                            "type": "integer",
+                                            "description": "FPP instances the account may monitor"
+                                        },
+                                        "maxKulp": {
+                                            "type": "integer",
+                                            "description": "Kulp controllers the account may monitor"
+                                        },
+                                        "maxOther": {
+                                            "type": "integer",
+                                            "description": "Other controllers the account may monitor"
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "status": "Connected",
+                                    "name": "Jane Example",
+                                    "email": "jane@example.com",
+                                    "pluginVersion": "2026.01.01-abcdef0",
+                                    "liveSystemSelection": true,
+                                    "maxFPP": 10,
+                                    "maxKulp": 30,
+                                    "maxOther": 0
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Store or clear the FPPMon sign-in credentials",
+                "description": "Replaces the stored credentials outright, and reconnects. Sent by the plugin's configuration page after signing in. All three fields are required: a body missing any of them is rejected rather than applied, so a stray or truncated request cannot destroy a working login. Signing out is expressed by sending all three empty.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "username",
+                                    "token",
+                                    "refresh_token"
+                                ],
+                                "properties": {
+                                    "username": {
+                                        "type": "string",
+                                        "description": "Account the tokens belong to; empty to sign out"
+                                    },
+                                    "token": {
+                                        "type": "string",
+                                        "description": "Access token; empty to sign out"
+                                    },
+                                    "refresh_token": {
+                                        "type": "string",
+                                        "description": "Refresh token; empty to sign out"
+                                    }
+                                }
+                            },
+                            "example": {
+                                "username": "jane@example.com",
+                                "token": "...",
+                                "refresh_token": "..."
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Accepted, or rejected as malformed - check the status field",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "ok",
+                                                "error"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "status": "ok"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The request could not be processed"
+                    }
+                }
+            }
+        }
+    }
+}

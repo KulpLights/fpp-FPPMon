@@ -2,7 +2,7 @@
 	"repoName": "fpp-FPPMon",
 	"name": "FPP Remote Monitoring Plugin (FPPMon)",
 	"author": "Daniel Kulp (dkulp)",
-	"description": "This plugin allows remote monitoring of FPP instances.",
+	"description": "Monitor FPP instances (and Falcon, Genius and WLED controllers) from the FPPMon mobile and desktop apps.",
 	"homeURL": "https://github.com/KulpLights/fpp-FPPMon",
 	"srcURL": "https://github.com/KulpLights/fpp-FPPMon.git",
 	"bugURL": "https://github.com/KulpLights/fpp-FPPMon/issues",
