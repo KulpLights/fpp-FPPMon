@@ -202,10 +202,15 @@ if (array_key_exists("systems", $arr)) {
     $groups = array();
     $order = array();
     foreach ($arr["systems"] as $i) {
-        // FPP Systems are 0x01 to 0x80; 0x80-0xBF are Falcon/Genius hardware
-        // controllers; 0xFB is WLED. The rest of the 0xC0+ range is gear the
-        // plugin can't monitor.
-        if (($i["typeId"] >= 1 && $i["typeId"] < 0xC0) || $i["typeId"] == 0xFB) {
+        // Keep this in step with mapType() in the plugin binary -- a row the
+        // page offers that the plugin then can't identify is a checkbox that
+        // does nothing. FPP systems are 0x01-0x7F; 0x80-0xBF are Falcon and
+        // Genius/Experience hardware; 0xC4 is Baldrick and 0xFB is WLED. Note
+        // 0x00 is kSysTypeUnknown (an address MultiSync probed but could not
+        // identify), not "an FPP", so the range deliberately starts at 1. The
+        // rest of 0xC0+ -- xSchedule, ESPixelStick, HinksPix, SanDevices,
+        // AlphaPix -- is gear the plugin can't monitor.
+        if (($i["typeId"] >= 1 && $i["typeId"] < 0xC0) || $i["typeId"] == 0xC4 || $i["typeId"] == 0xFB) {
             $uuid = isset($i["uuid"]) ? $i["uuid"] : "";
             $key = ($uuid != "" && $uuid != "Unknown") ? "u:" . $uuid : "a:" . $i["address"];
             if (!isset($groups[$key])) {
@@ -252,8 +257,28 @@ if (array_key_exists("systems", $arr)) {
             } else {
                 echo "<div class='row otherControllerType'>";
             }
-            PrintSettingCheckbox($i["hostname"] . "-" .  $addr, "FPPMon_" . $addr, $restartOnChange, 0, 1, 0, "fpp-FPPMon", "", 0);
-            echo "&nbsp;" . $i["hostname"] . "/" .  $addr;
+            // Hardware controllers rarely advertise a name of their own -- a
+            // Genius or a Falcon that hasn't been named reports its IP as the
+            // hostname, so the row rendered as "192.168.1.243/192.168.1.243"
+            // and gave no clue what the device even was. Name it from what
+            // MultiSync discovered instead.
+            //
+            // "model" first, "type" only as a backstop: type is the typeId's
+            // label, and every 2.x Genius shares one id (0xAF), so it can say
+            // no more than "Genius Controller" for a whole product line. The
+            // model is the controller's own string -- "Genius PRO: 16 Port",
+            // "Baldrick 8 Port v1" -- which is what tells two rows apart.
+            $label = $i["hostname"];
+            if ($label == "" || $label == $addr) {
+                foreach (array("model", "type") as $f) {
+                    if (isset($i[$f]) && $i[$f] != "") {
+                        $label = $i[$f];
+                        break;
+                    }
+                }
+            }
+            PrintSettingCheckbox($label . "-" .  $addr, "FPPMon_" . $addr, $restartOnChange, 0, 1, 0, "fpp-FPPMon", "", 0);
+            echo "&nbsp;" . $label . "/" .  $addr;
             echo "</div>";
         }
     }
