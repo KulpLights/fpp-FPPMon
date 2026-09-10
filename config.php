@@ -93,11 +93,18 @@ function CheckStatus() {
     });
 }
 
+// Builds the credentials body from a login response. The plugin requires all
+// three keys and rejects a body missing any of them -- which is deliberate,
+// since this POST replaces the stored credentials outright and an incomplete
+// one used to be enough to destroy a working login. So coerce each value:
+// JSON.stringify drops a key whose value is undefined, so reading a field that
+// is not there does not send an empty string, it sends no key at all, and the
+// POST is rejected with nothing to show for it.
 function SaveCredentials(data) {
     var creds = new Object();
-    creds['username'] = data['data']['nicename'];
-    creds['token'] = data['data']['token'];
-    creds['refresh_token'] = data['refresh_token'];
+    creds['username'] = data['data']['nicename'] || "";
+    creds['token'] = data['data']['token'] || "";
+    creds['refresh_token'] = data['refresh_token'] || "";
 
     $.ajax({
         url: "api/plugin-apis/FPPMon/credentials",
@@ -106,6 +113,18 @@ function SaveCredentials(data) {
         contentType: 'application/json',
         data:  JSON.stringify(creds, null, 2),
         success: function (data) {
+            // A rejected POST is answered with 200 and a status of "error", so
+            // jQuery calls this handler either way. Reloading on that redraws
+            // the page in whatever state it was already in, which is what made
+            // a failed logout look like nothing happening at all.
+            var reply = data;
+            if (typeof reply === "string") {
+                try { reply = JSON.parse(reply); } catch (e) { reply = {}; }
+            }
+            if (reply && reply['status'] == "error") {
+                $.jGrowl("FPPMon: the plugin rejected that request.");
+                return;
+            }
             // The plugin applies the new credentials as soon as this POST
             // lands (it re-runs its connection to the monitoring service), so
             // no fppd restart is needed here -- and restarting fppd from a
@@ -126,12 +145,17 @@ function SaveCredentials(data) {
     });
 
 }
+// Logging out is the same POST with all three values empty. The shape has to
+// match what SaveCredentials reads out of a real login response: nicename and
+// token nested under data, refresh_token at the top level. It used to put
+// refresh_token under data as well, so the key SaveCredentials looked for was
+// not there and the logout went out a key short and was ignored.
 function LogoutFromKulpLights() {
     var data = new Object();
     data['data'] = new Object();
     data['data']['nicename'] = "";
     data['data']['token'] = "";
-    data['data']['refresh_token'] = "";
+    data['refresh_token'] = "";
 
     SaveCredentials(data);
 }
