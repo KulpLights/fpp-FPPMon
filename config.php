@@ -2,6 +2,16 @@
 $output = array();
 exec($settings['fppDir'] . "/scripts/get_uuid", $output);
 $uuid = $output[0];
+
+// Both panels show the store badges. Held in one place so they cannot drift
+// apart again: the two copies had already grown different separators, and sat
+// in different places on the page because only one of them was inside a row.
+$storeBadges = <<<'HTML'
+    <a href="https://apps.apple.com/us/app/fppmon/id6445864655"><img alt='Get it in the App Store' src="images/plugin/fpp-FPPMon/images/AppleAppStore.png" height="48"></a><br>
+    <a href="https://play.google.com/store/apps/details?id=com.kulplights.fppmon"><img alt='Get it on Google Play' src="images/plugin/fpp-FPPMon/images/google-play-badge.png" height="48"></a><br>
+    <a href="https://apps.microsoft.com/detail/9pj02xstxjhr"><img alt='Download from the Microsoft Store' src="images/plugin/fpp-FPPMon/images/MicrosoftStore.png" height="48"></a><br>
+    <a href="https://kulplights.com/FPPMon/downloads/latest/"><img alt='Download for Linux' src="images/plugin/fpp-FPPMon/images/LinuxDownload.png" height="48"></a><br>
+HTML;
 ?>
 <script>
 function ShowConnecting() {
@@ -192,26 +202,32 @@ $(document).ready(function() {CheckStatus();});
 <h2>FPP Remote Monitoring Plugin</h2>
 <div class="container-fluid settingsTable settingsGroupTable" id="loginDiv" style="display:none">
 <div class="row"><div class="col-5">Login with your <a href="https://kulplights.com">KulpLights</a> account credentials</div></div>
-<div class="row"><div class="printSettingLabelCol description col-1">Username:</div><div class="col-1"><input type='text' id='klusername'></div></div>
-<div class="row"><div class="printSettingLabelCol description col-1">Password:</div><div class="col-1"><input type='password' id='klpassword'></div></div>
-<div class="row"><div class="col-1"></div><div class="col-1"><input type='button' class='buttons buttons-rounded' value="Login" onclick="LoginToKulpLights()"></div></div>
-<div class="col-1">
-    <a href="https://apps.apple.com/us/app/fppmon/id6445864655"><img alt='Get it in the App Store' src="images/plugin/fpp-FPPMon/images/AppleAppStore.png" height="48"></a>
-    <a href="https://play.google.com/store/apps/details?id=com.kulplights.fppmon"><img alt='Get it on Google Play' src="images/plugin/fpp-FPPMon/images/google-play-badge.png" height="48"></a>
-    <a href="https://apps.microsoft.com/detail/9pj02xstxjhr"><img alt='Download from the Microsoft Store' src="images/plugin/fpp-FPPMon/images/MicrosoftStore.png" height="48"></a>
-    <a href="https://kulplights.com/FPPMon/downloads/latest/"><img alt='Download for Linux' src="images/plugin/fpp-FPPMon/images/LinuxDownload.png" height="48"></a>
+<div class="row">
+<!-- Fixed width rather than col-auto so the badges beside it line up with the
+     ones on the connected panel, whose card is a different width. col-12 below
+     md so the badges drop underneath on a narrow screen instead of squeezing. -->
+<div class="col-12 col-md-4">
+<!-- col-auto, not col-1: these rows sit inside a column now, so a twelfth is a
+     twelfth of that column rather than of the page, which is narrower than the
+     word "Username:". Sizing the label to its own text does not care how wide
+     the container is. The button lines up with the fields by reserving that
+     same width with a copy of the widest label rather than a fixed column, so
+     it stays lined up whatever the text or font size. -->
+<div class="row"><div class="printSettingLabelCol description col-auto">Username:</div><div class="col-auto"><input type='text' id='klusername'></div></div>
+<div class="row"><div class="printSettingLabelCol description col-auto">Password:</div><div class="col-auto"><input type='password' id='klpassword'></div></div>
+<div class="row"><div class="printSettingLabelCol description col-auto" style="visibility:hidden" aria-hidden="true">Username:</div><div class="col-auto"><input type='button' class='buttons buttons-rounded' value="Login" onclick="LoginToKulpLights()"></div></div>
+</div>
+<div class="col-12 col-md-auto">
+<?= $storeBadges ?>
+</div>
 </div>
 </div>
 <div class="container-fluid" id="connectedDiv" style="display:none">
 FPP Remote Monitoring Connected<br>
 <div class=" row">
-<div class="backdrop col-auto" id="userInfoDiv"></div>
-<div class="col-1"></div>
-<div class="col-1">
-    <a href="https://apps.apple.com/us/app/fppmon/id6445864655"><img alt='Get it in the App Store' src="images/plugin/fpp-FPPMon/images/AppleAppStore.png" height="48"></a><br>
-    <a href="https://play.google.com/store/apps/details?id=com.kulplights.fppmon"><img alt='Get it on Google Play' src="images/plugin/fpp-FPPMon/images/google-play-badge.png" height="48"></a><br>
-    <a href="https://apps.microsoft.com/detail/9pj02xstxjhr"><img alt='Download from the Microsoft Store' src="images/plugin/fpp-FPPMon/images/MicrosoftStore.png" height="48"></a><br>
-    <a href="https://kulplights.com/FPPMon/downloads/latest/"><img alt='Download for Linux' src="images/plugin/fpp-FPPMon/images/LinuxDownload.png" height="48"></a><br>
+<div class="backdrop col-12 col-md-4" id="userInfoDiv"></div>
+<div class="col-12 col-md-auto">
+<?= $storeBadges ?>
 </div>
 </div>
 </div>
