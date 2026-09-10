@@ -4,16 +4,61 @@ exec($settings['fppDir'] . "/scripts/get_uuid", $output);
 $uuid = $output[0];
 ?>
 <script>
+function ShowConnecting() {
+    $("#loginDiv").hide();
+    $("#connectedDiv").hide();
+    $("#notRunningDiv").hide();
+    $("#connectingDiv").show();
+}
+// Waits out a login attempt. Only three states are an answer; everything else
+// -- Connecting, Could not connect, Unknown -- means the attempt has not
+// resolved yet, so keep waiting rather than drawing the login form back over a
+// login that is still working. Measured against real hardware, reaching
+// Connected took 8s when the token came back first time and ~26s when the
+// token fetch retried once, so the patience here is in that order rather than
+// the couple of seconds it used to be. When it does run out, render whatever
+// is actually true rather than assuming failure.
+function AwaitLogin(triesLeft) {
+    ShowConnecting();
+    $.ajax({
+        url: "api/plugin-apis/FPPMon",
+        type: "GET",
+        dataType: 'json',
+        cache: false,
+        success: function (data) {
+            var status = data['status'];
+            if (status == "Connected" || status == "Invalid Credentials" ||
+                status == "No Credentials" || triesLeft <= 0) {
+                CheckStatus();
+                return;
+            }
+            setTimeout(function () { AwaitLogin(triesLeft - 1); }, 1000);
+        },
+        error: function () { CheckStatus(); }
+    });
+}
+// Reads the plugin's state and redraws from it. Connecting is not a settled
+// answer, so keep asking until it becomes one -- the page used to sample this
+// once on load, which meant any state that settled a moment later was never
+// shown and the user had to refresh by hand to see they were logged in.
 function CheckStatus() {
     $.ajax({
         url: "api/plugin-apis/FPPMon",
         type: "GET",
         dataType: 'json',
-        async: false,
+        cache: false,
         success: function (data) {
             if (data['pluginVersion']) {
                 $("#pluginVersionDiv").text("Plugin build: " + data['pluginVersion']);
             }
+            if (data['status'] == "Connecting") {
+                // An older .so never reports this; it is only reachable from a
+                // build that distinguishes "not yet" from "rejected".
+                ShowConnecting();
+                setTimeout(CheckStatus, 1000);
+                return;
+            }
+            $("#connectingDiv").hide();
             if (data['status'] == "Connected") {
                 var html = "<div><b>" + data["name"] + "</b><br>";
                 html += data["email"] + "<br><br>";
@@ -42,6 +87,7 @@ function CheckStatus() {
             $("#connectedDiv").hide();
             $("#userInfoDiv").hide();
             $("#loginDiv").hide();
+            $("#connectingDiv").hide();
             $("#notRunningDiv").show();
         }
     });
@@ -65,39 +111,20 @@ function SaveCredentials(data) {
             // no fppd restart is needed here -- and restarting fppd from a
             // settings page would kill a running show.
             if (creds['username'] == "") {
-                location.reload();  // logout settles immediately
+                location.reload();  // logout: redraw the server-rendered page
                 return;
             }
-            $('html,body').css('cursor', 'wait');
-            ReloadWhenSettled(12);
+            // Logging in redraws from the polled state rather than reloading.
+            // A reload was a single sample taken at whatever instant it landed:
+            // too early and it caught the connect still in flight and drew the
+            // login form back over a login that was working.
+            AwaitLogin(90);
         },
         error: function () {
             location.reload();
         }
     });
 
-}
-// Connecting takes a couple of seconds, so reload only once the plugin reports
-// a state that won't change on its own -- reloading immediately would redraw
-// the login form and make a successful login look like it failed.
-function ReloadWhenSettled(triesLeft) {
-    $.ajax({
-        url: "api/plugin-apis/FPPMon",
-        type: "GET",
-        dataType: 'json',
-        success: function (data) {
-            var status = data['status'];
-            if (triesLeft <= 0 || status == "Connected" ||
-                status == "Invalid Credentials" || status == "No Credentials") {
-                location.reload();
-            } else {
-                setTimeout(function () { ReloadWhenSettled(triesLeft - 1); }, 1000);
-            }
-        },
-        error: function () {
-            location.reload();
-        }
-    });
 }
 function LogoutFromKulpLights() {
     var data = new Object();
@@ -139,7 +166,7 @@ $(document).ready(function() {CheckStatus();});
 
 <div id="global" class="settings">
 <h2>FPP Remote Monitoring Plugin</h2>
-<div class="container-fluid settingsTable settingsGroupTable" id="loginDiv">
+<div class="container-fluid settingsTable settingsGroupTable" id="loginDiv" style="display:none">
 <div class="row"><div class="col-5">Login with your <a href="https://kulplights.com">KulpLights</a> account credentials</div></div>
 <div class="row"><div class="printSettingLabelCol description col-1">Username:</div><div class="col-1"><input type='text' id='klusername'></div></div>
 <div class="row"><div class="printSettingLabelCol description col-1">Password:</div><div class="col-1"><input type='password' id='klpassword'></div></div>
@@ -151,7 +178,7 @@ $(document).ready(function() {CheckStatus();});
     <a href="https://kulplights.com/FPPMon/downloads/latest/"><img alt='Download for Linux' src="images/plugin/fpp-FPPMon/images/LinuxDownload.png" height="48"></a>
 </div>
 </div>
-<div class="container-fluid" id="connectedDiv">
+<div class="container-fluid" id="connectedDiv" style="display:none">
 FPP Remote Monitoring Connected<br>
 <div class=" row">
 <div class="backdrop col-auto" id="userInfoDiv"></div>
@@ -164,7 +191,10 @@ FPP Remote Monitoring Connected<br>
 </div>
 </div>
 </div>
-<div class="container-fluid settingsTable settingsGroupTable" id="notRunningDiv">
+<div class="container-fluid settingsTable settingsGroupTable" id="connectingDiv" style="display:none">
+Connecting to FPP Remote Monitoring...
+</div>
+<div class="container-fluid settingsTable settingsGroupTable" id="notRunningDiv" style="display:none">
 FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 </div>
 <br>
