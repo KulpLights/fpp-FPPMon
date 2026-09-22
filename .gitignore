@@ -1,3 +1,5 @@
 libfpp-FPPMon.so
 *.so.gz
 .binary-major
+.release-notes.txt
+.release-notes.txt.*

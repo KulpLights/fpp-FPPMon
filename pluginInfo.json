@@ -2,12 +2,59 @@
 	"repoName": "fpp-FPPMon",
 	"name": "FPP Remote Monitoring Plugin (FPPMon)",
 	"author": "Daniel Kulp (dkulp)",
-	"description": "Monitor FPP instances (and Falcon, Genius and WLED controllers) from the FPPMon mobile and desktop apps.",
+	"description": "Monitor and control FPP instances (and Falcon, Genius, WLED and Baldrick controllers) from the FPPMon mobile and desktop apps. Sign in with a KulpLights account (kulplights.com); the instances you select then report their status to mqtt.kulplights.com, which is how the apps reach them from off your network.",
 	"homeURL": "https://github.com/KulpLights/fpp-FPPMon",
 	"srcURL": "https://github.com/KulpLights/fpp-FPPMon.git",
 	"bugURL": "https://github.com/KulpLights/fpp-FPPMon/issues",
 	"iconURL": "https://raw.githubusercontent.com/KulpLights/fpp-FPPMon/master/icon.png",
 	"allowUpdates": 1,
+	"releaseNotesStyle": "script",
+	"privacy": {
+		"summary": "Lets the FPPMon phone and desktop apps watch and control the players you pick, by way of KulpLights' server. Nothing leaves this device until you sign in and choose them.",
+		"sends": [
+			{
+				"to": "kulplights.com",
+				"what": "your KulpLights account name and password",
+				"why": "to sign in, from the plugin's page in your browser",
+				"alwaysOn": false
+			},
+			{
+				"to": "mqtt.kulplights.com",
+				"what": "the status of the players you picked, and replies to what the app asks of them",
+				"why": "so the FPPMon app can show and control them from anywhere",
+				"alwaysOn": false
+			},
+			{
+				"to": "http://the players and controllers you pick on your network",
+				"what": "status requests, and whatever the app asks them to do",
+				"why": "to read their status and pass on what the app asks",
+				"alwaysOn": false
+			}
+		],
+		"collects": [
+			{
+				"what": "your KulpLights sign-in token",
+				"about": "operator",
+				"keptDays": null,
+				"canDelete": true,
+				"where": "plugindata/fpp-FPPMon/, cleared by Logout on the plugin page"
+			}
+		],
+		"sensors": [],
+		"remoteAccess": "exposes-fpp",
+		"systemChanges": [
+			{
+				"kind": "download",
+				"what": "downloads this plugin's prebuilt binary from its own GitHub releases at install, at boot, and when you update it"
+			},
+			{
+				"kind": "tunnel",
+				"what": "holds an outgoing connection to mqtt.kulplights.com that the app reaches this player's FPP pages through"
+			}
+		],
+		"closedCode": true,
+		"other": "Only apps signed in to the same KulpLights account reach this player, and only while you are signed in on it; signing out on the plugin page ends it. The plugin runs as a prebuilt binary whose source is not published. It sends nothing to the developer beyond what the app asks for."
+	},
 	"versions": [
         {
             "minFPPVersion": "7.1",
