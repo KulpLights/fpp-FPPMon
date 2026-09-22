@@ -44,10 +44,6 @@
 		"remoteAccess": "exposes-fpp",
 		"systemChanges": [
 			{
-				"kind": "download",
-				"what": "downloads this plugin's prebuilt binary from its own GitHub releases at install, at boot, and when you update it"
-			},
-			{
 				"kind": "tunnel",
 				"what": "holds an outgoing connection to mqtt.kulplights.com that the app reaches this player's FPP pages through"
 			}
