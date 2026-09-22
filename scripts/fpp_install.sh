@@ -11,6 +11,22 @@ BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 
 . ${FPPDIR}/scripts/common
 
+# Allow the config page's browser-side login POST to reach kulplights.com.
+# FPP serves plugin pages under a Content-Security-Policy whose connect-src is
+# 'self' plus a built-in list; kulplights.com happens to be on that list today,
+# but it is not FPP's own service and there is no promise it stays there, so ask
+# for it explicitly rather than relying on someone else's default. Adding a
+# domain that is already allowed is a no-op, and fpp_uninstall.sh removes it.
+# Declared in pluginInfo.json's privacy block (PLUGIN_GUIDELINES.md 14.1).
+#
+# Run from /tmp: the helper builds its new JSON as ./tmp.json in the caller's
+# working directory, and a failed jq would leave that behind in the plugin dir.
+MACP="${FPPDIR}/scripts/ManageApacheContentPolicy.sh"
+if [ -x "${MACP}" ]; then
+    (cd /tmp && "${MACP}" add connect-src https://kulplights.com) || \
+        echo "fpp-FPPMon: could not add the CSP entry for kulplights.com"
+fi
+
 # FPP 10 loads a freshly installed plugin itself: the plugin manager calls
 # fppd's load endpoint right after this script returns, so the .so we just
 # placed is picked up without an fppd restart. Asking for one there is a

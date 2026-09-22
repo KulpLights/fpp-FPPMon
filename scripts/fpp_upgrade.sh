@@ -43,6 +43,15 @@ AFTER="$(sha_of "${TARGET}")"
 
 . ${FPPDIR}/scripts/common
 
+# Same CSP entry fpp_install.sh asks for -- FPP runs this script *instead of*
+# re-running the install script, so an install that predates it would otherwise
+# never get it. Adding an allowed domain again is a no-op.
+MACP="${FPPDIR}/scripts/ManageApacheContentPolicy.sh"
+if [ -x "${MACP}" ]; then
+    (cd /tmp && "${MACP}" add connect-src https://kulplights.com) || \
+        echo "fpp-FPPMon: could not add the CSP entry for kulplights.com"
+fi
+
 if [ "${BEFORE}" != "${AFTER}" ]; then
     setSetting restartFlag 1
 else
