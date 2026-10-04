@@ -265,10 +265,14 @@ if (array_key_exists("systems", $arr)) {
     // rows sharing a uuid into one entry. Preferences within a group: an
     // address the user already selected always renders (an existing selection
     // must never turn into a hidden checkbox plus a second unchecked row),
-    // otherwise IPv4 beats IPv6 beats loopback, ties broken by discovery
-    // order. Rows without a usable uuid (hardware controllers, old FPP) are
-    // not grouped at all -- keying those on hostname could wrongly merge two
-    // identically-named controllers.
+    // otherwise IPv4 beats IPv6, ties broken by discovery order. Loopback and
+    // link-local addresses (169.254/16 APIPA, fe80::/10) are never offered --
+    // the same rows FPP's own MultiSync page hides. A box whose DHCP lease
+    // lapsed on one interface keeps advertising its APIPA address next to its
+    // real one, and that address is no use to the plugin. Rows without a
+    // usable uuid (hardware controllers, old FPP) are not grouped at all --
+    // keying those on hostname could wrongly merge two identically-named
+    // controllers.
     $groups = array();
     $order = array();
     foreach ($arr["systems"] as $i) {
@@ -299,10 +303,14 @@ if (array_key_exists("systems", $arr)) {
             // lands in the (not found) leftovers below.
             unset($origSystemSettings["FPPMon_" . $addr]);
             $selected = isset($pluginSettings["FPPMon_" . $addr]) && $pluginSettings["FPPMon_" . $addr] == "1";
+            $addrl = strtolower($addr);
             if ($selected) {
                 $score = 0;
-            } else if ($addr == "127.0.0.1" || $addr == "::1") {
-                $score = 3;
+            } else if (strpos($addr, '169.254.') === 0 || strpos($addrl, 'fe80') === 0
+                       || strpos($addr, '127.') === 0 || $addrl == '::1') {
+                // Never preferred. An unselected group with nothing better
+                // (a box seen only by its APIPA address) renders no row.
+                continue;
             } else if (strpos($addr, ':') !== false) {
                 $score = 2;
             } else {
@@ -313,15 +321,19 @@ if (array_key_exists("systems", $arr)) {
                 $bestAddr = $addr;
             }
         }
+        $rendered = array();
         foreach ($groups[$key] as $i) {
             $addr = $i["address"];
             $selected = isset($pluginSettings["FPPMon_" . $addr]) && $pluginSettings["FPPMon_" . $addr] == "1";
             // Render the preferred row, plus any *other* rows the user has
             // selected (both checked, so a redundant selection stays visible
-            // and can be cleared); hide only unselected duplicates.
-            if ($addr != $bestAddr && !$selected) {
+            // and can be cleared); hide only unselected duplicates. The local
+            // box is in the roster twice under the same address (once as
+            // itself, once as a peer saw it), so render each address once.
+            if (($addr != $bestAddr && !$selected) || isset($rendered[$addr])) {
                 continue;
             }
+            $rendered[$addr] = true;
             if ($i["typeId"] < 0x80) {
                 echo "<div class='row'>";
             } else {
