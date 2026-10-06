@@ -73,7 +73,9 @@ fi
 
 LOCAL=""
 if [ -s "${SO}" ]; then
-    LOCAL="$(strings "${SO}" 2>/dev/null | sed -n 's/^FPPMon-build://p' | head -1)"
+    # grep -a, not `strings`: same answer without needing binutils installed.
+    # Matches the reader in fetch-binary.sh.
+    LOCAL="$(LC_ALL=C grep -ao 'FPPMon-build:[0-9A-Za-z._-]*' "${SO}" 2>/dev/null | head -1 | cut -d: -f2)"
 fi
 
 echo "fpp-FPPMon: installed build '${LOCAL:-unknown}', latest release '${REMOTE}'"

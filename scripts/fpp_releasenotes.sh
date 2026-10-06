@@ -29,10 +29,16 @@ fi
 # Always close with what is actually loaded on this box, so the notes above can
 # be read as "installed" or "available" without guessing.
 LOCAL=""
+ABI=""
 if [ -r "${SO}" ]; then
-    LOCAL="$(strings "${SO}" 2>/dev/null | sed -n 's/^FPPMon-build://p' | head -1)"
+    LOCAL="$(LC_ALL=C grep -ao 'FPPMon-build:[0-9A-Za-z._-]*' "${SO}" 2>/dev/null | head -1 | cut -d: -f2)"
+    ABI="$(LC_ALL=C grep -ao 'FPPMon-abi:[0-9A-Za-z._-]*' "${SO}" 2>/dev/null | head -1 | cut -d: -f2)"
 fi
-echo "Installed build: ${LOCAL:-unknown}"
+if [ -n "${ABI}" ] && [ "${ABI}" != "none" ]; then
+    echo "Installed build: ${LOCAL:-unknown} (plugin ABI ${ABI})"
+else
+    echo "Installed build: ${LOCAL:-unknown}"
+fi
 
 if [ ! -s "${CACHE}" ]; then
     echo

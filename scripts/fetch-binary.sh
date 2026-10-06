@@ -109,10 +109,43 @@ else
     DESC="FPP ${MAJ}"
 fi
 
+# Read a marker string the plugin exports out of a .so (see FPPMON_ABI_MARKER /
+# FPPMON_BUILD_MARKER in src/FPPMonitorPlugin.cpp). grep -a rather than
+# `strings`, so this does not depend on binutils being installed.
+so_marker() {
+    LC_ALL=C grep -ao "FPPMon-${2}:[0-9A-Za-z._-]*" "$1" 2>/dev/null | head -1 | cut -d: -f2
+}
+
+# Does a .so declare an ABI this fppd will actually load? Three answers:
+# "ok", "unknown" (nothing to compare -- either this FPP predates the version
+# gate, or the binary predates this marker), or "no".
+abi_fits() {
+    _got="$(so_marker "$1" abi)"
+    if [ -z "${ABI}" ] || [ -z "${_got}" ]; then
+        echo "unknown"
+    elif [ "${_got}" = "${ABI}" ]; then
+        echo "ok"
+    else
+        echo "no"
+    fi
+}
+
 # --- Skip if we already have the right binary --------------------------------
+# The marker alone is not enough. It records what the *core* wanted at the time
+# it was written, so a download that turned out to be the wrong build still
+# stamped it "current" -- and the box then never re-fetched, staying broken
+# through every boot until someone deleted the file by hand. Ask the installed
+# binary what it is as well, and treat a disagreement as "not present".
 if [ -s "${TARGET}" ] && [ "$(cat "${MARKER}" 2>/dev/null)" = "${KEY}" ]; then
-    echo "fpp-FPPMon: ${PLAT} binary for ${DESC} already present"
-    exit 0
+    case "$(abi_fits "${TARGET}")" in
+        no)
+            echo "fpp-FPPMon: installed binary is built for plugin ABI $(so_marker "${TARGET}" abi), but this FPP wants ${ABI} -- re-fetching"
+            ;;
+        *)
+            echo "fpp-FPPMon: ${PLAT} binary for ${DESC} already present"
+            exit 0
+            ;;
+    esac
 fi
 
 ASSET="libfpp-FPPMon-${PLAT}-${MAJ}.so.gz"
@@ -188,6 +221,23 @@ if ! gunzip -f "${TMP}"; then
     echo "fpp-FPPMon: ERROR decompressing ${ASSET}" >&2
     exit 1
 fi
+
+# Never put a binary fppd cannot load where fppd will try to load it. A
+# mismatch here means the release does not yet carry a build for this FPP's
+# plugin ABI; installing it anyway is worse than installing nothing, because a
+# plugin built against a different layout of a struct FPP hands it can load
+# cleanly and then corrupt the heap. Leave the marker unwritten so the next
+# boot tries again on its own once a matching build is published.
+case "$(abi_fits "${TMP%.gz}")" in
+    no)
+        echo "fpp-FPPMon: ERROR: ${ASSET} is built for plugin ABI $(so_marker "${TMP%.gz}" abi), but this FPP wants ${ABI}." >&2
+        echo "fpp-FPPMon: not installing it. A build for ABI ${ABI} has not been published yet." >&2
+        exit 1
+        ;;
+    unknown)
+        [ -n "${ABI}" ] && echo "fpp-FPPMon: ${ASSET} carries no ABI stamp, cannot check it against ${ABI}"
+        ;;
+esac
 
 # Atomically replace the live .so and record which major it was built for.
 # mktemp creates the temp file 0600 and mv preserves that mode, which left
