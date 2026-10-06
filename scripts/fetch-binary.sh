@@ -148,7 +148,39 @@ if [ -s "${TARGET}" ] && [ "$(cat "${MARKER}" 2>/dev/null)" = "${KEY}" ]; then
     esac
 fi
 
-ASSET="libfpp-FPPMon-${PLAT}-${MAJ}.so.gz"
+# --- Which asset? ------------------------------------------------------------
+# builds.txt lists what the release actually holds, one line per asset:
+#   <asset> <platform> <major> <abi> <version> <sha256>
+# Ask it for the build made for this platform AND this FPP's plugin ABI. Asking
+# by major alone was only ever right because there happened to be one binary per
+# major: FPP bumps FPP_PLUGIN_API_VERSION *within* a major, so "the FPP 10
+# binary" is not one thing, and a box that cannot say which one it can load gets
+# handed whichever was built last.
+MANIFEST="$(mktemp "${TMPDIR:-/tmp}/fpp-FPPMon.XXXXXX.builds")"
+ASSET=""
+if curl -fsL --retry 2 --max-time 20 -o "${MANIFEST}" \
+        "${REPO_URL}/releases/download/fpp${MAJ}/builds.txt"; then
+    ROW="$(awk -v p="${PLAT}" -v m="${MAJ}" -v a="${ABI:-none}" \
+        '$2 == p && $3 == m && $4 == a { print $1 " " $5; exit }' "${MANIFEST}")"
+    if [ -z "${ROW}" ]; then
+        echo "fpp-FPPMon: ERROR: no ${PLAT} build for ${DESC} in release fpp${MAJ}." >&2
+        echo "fpp-FPPMon: what is published for ${PLAT}:" >&2
+        awk -v p="${PLAT}" '$2 == p { print "    FPP " $3 ", plugin ABI " $4 " -> " $1 }' "${MANIFEST}" >&2
+        echo "fpp-FPPMon: leaving the installed binary alone; this will retry on the next boot." >&2
+        rm -f "${MANIFEST}"
+        exit 1
+    fi
+    ASSET="${ROW% *}"
+    echo "fpp-FPPMon: ${ASSET} is the published build for ${DESC} (${ROW#* })"
+else
+    # A release predating builds.txt carried one binary per major, named without
+    # the ABI. Keep fetching it the old way; the stamp check below still refuses
+    # it if it turns out not to fit.
+    ASSET="libfpp-FPPMon-${PLAT}-${MAJ}.so.gz"
+    echo "fpp-FPPMon: release fpp${MAJ} has no builds.txt, falling back to ${ASSET}"
+fi
+rm -f "${MANIFEST}"
+
 URL="${REPO_URL}/releases/download/fpp${MAJ}/${ASSET}"
 SUMSURL="${REPO_URL}/releases/download/fpp${MAJ}/checksums.txt"
 echo "fpp-FPPMon: downloading ${ASSET} ..."

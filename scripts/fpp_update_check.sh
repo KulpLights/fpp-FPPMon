@@ -52,10 +52,38 @@ if [ -z "${MAJ}" ]; then
     exit 0
 fi
 
-REMOTE="$(curl -fsSL --max-time 20 "${REPO_API}/releases/tags/fpp${MAJ}" 2>/dev/null |
-    grep -oE 'version: [0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9a-f]+' | head -1 | cut -d' ' -f2)"
+# Which plugin ABI this FPP wants. The published version is per-ABI: a release
+# can hold builds for several at once, and the only one that matters here is the
+# one this box could actually install. Reporting an update it cannot have is
+# worse than reporting none.
+ABI="$(sed -nE 's/^#define[[:space:]]+FPP_PLUGIN_API_VERSION[[:space:]]+([0-9]+).*/\1/p' \
+    "${FPPDIR}/src/Plugin.h" 2>/dev/null | head -1)"
+
+# builds.txt is the release's own list of what it holds (see fetch-binary.sh);
+# every asset in a run carries the same plugin version, so any row for this
+# major and ABI answers the question.
+REMOTE=""
+MANIFEST="$(mktemp "${TMPDIR:-/tmp}/fpp-FPPMon.XXXXXX.builds")"
+if curl -fsL --retry 2 --max-time 20 -o "${MANIFEST}" \
+        "${REPO_URL}/releases/download/fpp${MAJ}/builds.txt" 2>/dev/null; then
+    REMOTE="$(awk -v m="${MAJ}" -v a="${ABI:-none}" \
+        '$3 == m && $4 == a { print $5; exit }' "${MANIFEST}")"
+    if [ -z "${REMOTE}" ]; then
+        echo "fpp-FPPMon: release fpp${MAJ} has no build for plugin ABI ${ABI:-none} yet"
+        rm -f "${MANIFEST}"
+        echo "0"
+        exit 0
+    fi
+fi
+rm -f "${MANIFEST}"
+
 if [ -z "${REMOTE}" ]; then
-    # No network / no release / notes not stamped yet: can't tell, don't nag.
+    # A release predating builds.txt stamps the version into its body instead.
+    REMOTE="$(curl -fsSL --max-time 20 "${REPO_API}/releases/tags/fpp${MAJ}" 2>/dev/null |
+        grep -oE 'version: [0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9a-f]+' | head -1 | cut -d' ' -f2)"
+fi
+if [ -z "${REMOTE}" ]; then
+    # No network / no release / nothing stamped yet: can't tell, don't nag.
     echo "fpp-FPPMon: could not determine latest released version"
     echo "0"
     exit 0
