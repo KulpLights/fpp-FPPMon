@@ -11,14 +11,19 @@
 # so only an explicit upgrade (or fpp_update_check.sh reporting a newer build
 # stamp, which is what puts the Upgrade button in front of the user) shifts it.
 #
-# Unlike install, an upgrade genuinely needs an fppd restart -- but only when
-# the binary actually moved. FPP does not reload a plugin after an upgrade, and
-# this plugin deliberately does not declare FPP_PLUGIN_SUPPORTS_UNLOAD (its
-# drogon WebSocketClient can queue handlers onto a trantor loop past shutdown,
-# so the library is never dlclose()d), which means the running code stays the
-# old build until fppd restarts. When the download turns out to be the same
-# build that is already loaded -- the common case for a git-only upgrade --
-# nothing changed and there is nothing to restart for.
+# When the binary actually moved, the running fppd still has the old build and
+# has to be told. In order of preference:
+#   - FPP says it reloads the plugin itself once the upgrade lands
+#     (FPP_RELOADS_PLUGIN=1): nothing to do here.
+#   - FPP 10 can unload and load a plugin at runtime but does not do it after an
+#     upgrade: ask it to here. The new .so is a new file (fetch-binary.sh
+#     renames it into place), and fppd opens a replaced library under a name of
+#     its own, so the new build is what loads -- no restart, no interrupted show.
+#   - Anything else (FPP 9, or fppd refusing): the restart flag, so FPP restarts
+#     between sequences.
+# When the download turns out to be the same build that is already loaded --
+# the common case for a git-only upgrade -- nothing changed and there is
+# nothing to do.
 #############################################################################
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
@@ -52,10 +57,32 @@ if [ -x "${MACP}" ]; then
         echo "fpp-FPPMon: could not add the CSP entry for kulplights.com"
 fi
 
-if [ "${BEFORE}" != "${AFTER}" ]; then
-    setSetting restartFlag 1
-else
+# Unload then load through the documented proxy; true only if both succeed.
+# fppd not answering at all counts as success: it is not running, and loads
+# the new build when it starts.
+reload_in_fppd() {
+    local base="http://localhost/api/fppd/plugin/$(basename "${BASEDIR}")"
+    local action resp
+    for action in unload load; do
+        if ! resp="$(curl -s --max-time 40 -X POST "${base}/${action}")"; then
+            [ "${action}" = "unload" ] && return 0
+            return 1
+        fi
+        case "${resp}" in
+            *'"Status":"OK"'*) ;;
+            *) echo "fpp-FPPMon: fppd could not ${action} the plugin: ${resp}"; return 1 ;;
+        esac
+    done
+}
+
+if [ "${BEFORE}" = "${AFTER}" ]; then
     echo "fpp-FPPMon: binary unchanged, no fppd restart requested"
+elif [ "${FPP_RELOADS_PLUGIN}" = "1" ]; then
+    echo "fpp-FPPMon: FPP reloads the updated plugin itself"
+elif grep -q "FPPDPluginLifecycle" "${FPPDIR}/www/api/controllers/plugin.php" 2>/dev/null && reload_in_fppd; then
+    echo "fpp-FPPMon: reloaded the updated plugin in fppd, no restart needed"
+else
+    setSetting restartFlag 1
 fi
 
 exit $RC
