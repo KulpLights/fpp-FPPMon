@@ -82,6 +82,11 @@ function CheckStatus() {
                 $("#loginDiv").hide();
                 $("#connectedDiv").show();
                 $("#notRunningDiv").hide();
+                ShowTabs(true);
+                // An older binary answers without this and ignores the
+                // IgnoreWarning_ settings, so say so rather than offer
+                // checkboxes that do nothing.
+                $("#ignoreWarningsUnsupported").toggle(!data["ignoreWarnings"]);
 
                 if (data["maxOther"] == 0) {
                     $(".otherControllerType").hide();
@@ -91,6 +96,7 @@ function CheckStatus() {
                 $("#userInfoDiv").hide();
                 $("#connectedDiv").hide();
                 $("#notRunningDiv").hide();
+                ShowTabs(false);
             }
         },
         error: function(data) {
@@ -99,8 +105,18 @@ function CheckStatus() {
             $("#loginDiv").hide();
             $("#connectingDiv").hide();
             $("#notRunningDiv").show();
+            ShowTabs(false);
         }
     });
+}
+
+// The tabs only appear once logged in: until then there are no notifications
+// to choose between, so the page is the system list alone, as it always was.
+function ShowTabs(loggedIn) {
+    $("#fppmonTabNav").toggle(loggedIn);
+    if (!loggedIn) {
+        bootstrap.Tab.getOrCreateInstance(document.getElementById("fppmon-systems-tab")).show();
+    }
 }
 
 // Builds the credentials body from a login response. The plugin requires all
@@ -238,7 +254,19 @@ Connecting to FPP Remote Monitoring...
 FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 </div>
 <br>
-<div class="container-fluid settingsTable settingsGroupTable">    
+<ul class="nav nav-tabs" id="fppmonTabNav" role="tablist" style="display:none">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link active" id="fppmon-systems-tab" data-bs-toggle="tab" data-bs-target="#fppmon-systems"
+           href="#fppmon-systems" role="tab" aria-controls="fppmon-systems" aria-selected="true">Monitored Systems</a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" id="fppmon-warnings-tab" data-bs-toggle="tab" data-bs-target="#fppmon-warnings"
+           href="#fppmon-warnings" role="tab" aria-controls="fppmon-warnings" aria-selected="false">Warning Notifications</a>
+    </li>
+</ul>
+<div class="tab-content">
+<div class="tab-pane fade show active" id="fppmon-systems" role="tabpanel" aria-labelledby="fppmon-systems-tab">
+<div class="container-fluid settingsTable settingsGroupTable">
     <div class="row">Select FPP Instances and Controllers to Monitor:</div>
 <?
 // Via the web server's documented proxy, not fppd's internal port directly.
@@ -365,7 +393,9 @@ if (array_key_exists("systems", $arr)) {
         }
     }
     foreach ($origSystemSettings as $key => $i) {
-        if ($i == "1") {
+        // Only the system checkboxes; the same file holds the IgnoreWarning_
+        // settings from the Warning Notifications tab.
+        if ($i == "1" && strpos($key, "FPPMon_") === 0) {
             echo "<div class='row'>";
             $ip = substr($key, 7);
             PrintSettingCheckbox($ip, $key, $restartOnChange, 0, 1, 0, "fpp-FPPMon", "", 0);
@@ -375,6 +405,77 @@ if (array_key_exists("systems", $arr)) {
     }
 }
 ?>
+</div>
+</div>
+<div class="tab-pane fade" id="fppmon-warnings" role="tabpanel" aria-labelledby="fppmon-warnings-tab">
+<style>#fppmon-warnings input[type=checkbox] { flex-shrink: 0; }</style>
+<div class="container-fluid settingsTable settingsGroupTable">
+    <div class="row"><div class="col-12">
+    Check a warning to stop it sending notifications. It still shows in the
+    FPPMon app; this only holds back the notification. This applies to every
+    monitored system. The FPP Commands <b>FPPMon - Disable Warning Notification</b>
+    and <b>FPPMon - Enable Warning Notification</b> change the same settings,
+    so a playlist or schedule can, for example, silence a projector's
+    "no display" warning while the projector is meant to be off.
+    </div></div>
+    <div class="row" id="ignoreWarningsUnsupported" style="display:none"><div class="col-12 text-danger">
+    The installed plugin binary does not support this yet. Update the plugin, then restart FPPD.
+    </div></div>
+<?
+// The numbered warnings this FPP defines -- the same file FPP's own warning
+// popups read, and the one the plugin binary loads to decide which numbers
+// "All Others" covers, so the page and the plugin agree on what is listed.
+$defs = json_decode(@file_get_contents($settings['fppDir'] . "/www/warnings-definitions.json"), true);
+$groups = array();
+if (is_array($defs) && isset($defs["Warnings"]) && is_array($defs["Warnings"])) {
+    $groupOrder = isset($defs["WarningGroups"]) && is_array($defs["WarningGroups"]) ? array_keys($defs["WarningGroups"]) : array();
+    foreach ($groupOrder as $g) {
+        $groups[$g] = array();
+    }
+    foreach ($defs["Warnings"] as $w) {
+        $id = isset($w["id"]) ? intval($w["id"]) : 0;
+        if ($id <= 0) {
+            continue;
+        }
+        $g = isset($w["WarningGroup"]) && $w["WarningGroup"] != "" ? $w["WarningGroup"] : "Other";
+        $groups[$g][$id] = $w;
+    }
+}
+// One cell of a group's row: the groups flow into columns on a wide screen,
+// since some hold a couple of dozen warnings.
+function FPPMonPrintIgnoreWarning($key, $title, $help) {
+    // Flex so a long title wraps beside its checkbox rather than under it.
+    echo "<div class='col-12 col-md-6 col-xl-4 d-flex align-items-start'>";
+    PrintSettingCheckbox($title, "IgnoreWarning_" . $key, 0, 0, "1", "0", "fpp-FPPMon", "", 0);
+    echo "<label class='ms-2' for='IgnoreWarning_" . $key . "' title='" . htmlspecialchars($help, ENT_QUOTES) . "'>" . htmlspecialchars($title) . "</label>";
+    echo "</div>";
+}
+if (empty($groups)) {
+    echo "<div class='row'><div class='col-12'>This FPP has no list of numbered warnings; only the choices below are available.</div></div>";
+}
+foreach ($groups as $g => $list) {
+    if (empty($list)) {
+        continue;
+    }
+    ksort($list);
+    $label = str_replace("_", " ", preg_replace('/_Warnings$/', '', $g));
+    echo "<div class='row'><div class='col-12'><br><b>" . htmlspecialchars($label) . "</b></div></div><div class='row'>";
+    foreach ($list as $id => $w) {
+        $title = rtrim(isset($w["Title"]) ? $w["Title"] : "", ".");
+        FPPMonPrintIgnoreWarning($id, "#" . $id . " " . $title, isset($w["HelpTxt"]) ? $w["HelpTxt"] : "");
+    }
+    echo "</div>";
+}
+echo "<div class='row'><div class='col-12'><br><b>Other</b></div></div><div class='row'>";
+FPPMonPrintIgnoreWarning("unreachable", "Controller Unreachable",
+    "FPPMon's own warning when a monitored system stops answering.");
+FPPMonPrintIgnoreWarning("other", "All Others",
+    "Warnings without a number above: unnumbered FPP warnings, warnings raised by FPP plugins, " .
+    "numbers this FPP does not list, and warnings from non-FPP controllers such as eFuse trips.");
+echo "</div>";
+?>
+</div>
+</div>
 </div>
 <div>
     Please log any bugs/issues/suggestions at <a href="https://github.com/KulpLights/fpp-FPPMon/issues">https://github.com/KulpLights/fpp-FPPMon/issues</a>

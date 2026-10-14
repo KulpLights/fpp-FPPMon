@@ -32,6 +32,10 @@
                                             "type": "boolean",
                                             "description": "Whether systems can be selected without restarting fppd"
                                         },
+                                        "ignoreWarnings": {
+                                            "type": "boolean",
+                                            "description": "Whether this build honours the per-warning notification settings on the Warning Notifications tab"
+                                        },
                                         "maxFPP": {
                                             "type": "integer",
                                             "description": "FPP instances the account may monitor"
