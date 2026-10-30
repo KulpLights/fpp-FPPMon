@@ -129,8 +129,14 @@ function ShowAdditionalAccounts(data) {
         var label = a["status"] == "Connected" ? (a["name"] + " (" + a["email"] + ")") : a["username"];
         html += "<div class='row'><div class='col-auto'><b>" + $("<div>").text(label).html() + "</b>: " +
                 $("<div>").text(a["status"]).html() + "</div>";
+        var user = JSON.stringify(a["username"]).replace(/'/g, "&#39;");
+        // An older binary doesn't report viewOnly, and wouldn't honour it.
+        if ("viewOnly" in a) {
+            html += "<div class='col-auto'><label><input type='checkbox' " + (a["viewOnly"] ? "checked " : "") +
+                    "onchange='SetViewOnly(" + user + ", this.checked)'> View only</label></div>";
+        }
         html += "<div class='col-auto'><input type='button' class='buttons buttons-rounded' value='Remove' " +
-                "onclick='RemoveAccount(" + JSON.stringify(a["username"]).replace(/'/g, "&#39;") + ")'></div></div>";
+                "onclick='RemoveAccount(" + user + ")'></div></div>";
         if (a["status"] == "Connecting") {
             settling = true;
         }
@@ -166,6 +172,17 @@ function AddAccount() {
         error: function (data) {
             $.jGrowl(data['message'] || "FPPMon: that login did not work.");
         }
+    });
+}
+// View only: the user sees statuses and notifications and can refresh, but
+// can't run commands, tests or presets, or open the FPP web interface.
+function SetViewOnly(username, value) {
+    $.ajax({
+        url: "api/plugin-apis/FPPMon/credentials",
+        type: "POST",
+        contentType: 'application/json',
+        data: JSON.stringify({"viewOnly": username, "value": value}),
+        complete: function () { CheckStatus(); }
     });
 }
 function RemoveAccount(username) {
@@ -570,7 +587,9 @@ echo "</div>";
 <div class="row"><div class="col-12">
 Someone else who should see this show in their own FPPMon app, such as the
 person who set it up, can be authorized here with their KulpLights account.
-Each authorized user needs their own FPPMon subscription.
+Each authorized user needs their own FPPMon subscription. A user marked
+<b>View only</b> sees statuses and gets notifications, but can't run
+commands, tests or presets, or open the FPP web interface.
 </div></div>
 <div id="additionalAccountList"></div>
 <div id="addAccountForm">
