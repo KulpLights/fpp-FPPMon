@@ -92,6 +92,7 @@ function CheckStatus() {
                 if (data["maxOther"] == 0) {
                     $(".otherControllerType").hide();
                 }
+                ShowAdditionalAccounts(data);
             } else {
                 $("#loginDiv").show();
                 $("#userInfoDiv").hide();
@@ -111,6 +112,72 @@ function CheckStatus() {
     });
 }
 
+// Accounts added beside the box's own, so that someone else (the person who
+// set the show up, say) sees it in their own FPPMon app under their own
+// account. Only a binary that reports maxAccounts takes them.
+function ShowAdditionalAccounts(data) {
+    var max = data["maxAccounts"];
+    if (!max) {
+        $("#fppmonAccountsTabItem").hide();
+        return;
+    }
+    var accounts = data["accounts"] || [];
+    var html = "";
+    var settling = false;
+    for (var i = 0; i < accounts.length; i++) {
+        var a = accounts[i];
+        var label = a["status"] == "Connected" ? (a["name"] + " (" + a["email"] + ")") : a["username"];
+        html += "<div class='row'><div class='col-auto'><b>" + $("<div>").text(label).html() + "</b>: " +
+                $("<div>").text(a["status"]).html() + "</div>";
+        html += "<div class='col-auto'><input type='button' class='buttons buttons-rounded' value='Remove' " +
+                "onclick='RemoveAccount(" + JSON.stringify(a["username"]).replace(/'/g, "&#39;") + ")'></div></div>";
+        if (a["status"] == "Connecting") {
+            settling = true;
+        }
+    }
+    if (accounts.length == 0) {
+        html = "<div class='row'><div class='col-12'><br>No authorized users.</div></div>";
+    } else {
+        html = "<div class='row'><div class='col-12'><br><b>Authorized users</b></div></div>" + html;
+    }
+    $("#additionalAccountList").html(html);
+    $("#addAccountForm").toggle(accounts.length < max - 1);
+    $("#fppmonAccountsTabItem").show();
+    if (settling) {
+        setTimeout(CheckStatus, 2000);
+    }
+}
+function AddAccount() {
+    var data = new Object();
+    data['username'] = $("#addusername").val();
+    data['password'] = $("#addpassword").val();
+    data['device'] = "<?= $uuid?>";
+    $.ajax({
+        url: "https://kulplights.com/wp-json/jwt-auth/v1/token",
+        type: "POST",
+        contentType: 'application/x-www-form-urlencoded',
+        data: data,
+        dataType: 'json',
+        success: function (data) {
+            $("#addusername").val("");
+            $("#addpassword").val("");
+            SaveCredentials(data, true);
+        },
+        error: function (data) {
+            $.jGrowl(data['message'] || "FPPMon: that login did not work.");
+        }
+    });
+}
+function RemoveAccount(username) {
+    $.ajax({
+        url: "api/plugin-apis/FPPMon/credentials",
+        type: "POST",
+        contentType: 'application/json',
+        data: JSON.stringify({"remove": username}),
+        complete: function () { CheckStatus(); }
+    });
+}
+
 // The tabs only appear once logged in: until then there are no notifications
 // to choose between, so the page is the system list alone, as it always was.
 function ShowTabs(loggedIn) {
@@ -127,11 +194,14 @@ function ShowTabs(loggedIn) {
 // JSON.stringify drops a key whose value is undefined, so reading a field that
 // is not there does not send an empty string, it sends no key at all, and the
 // POST is rejected with nothing to show for it.
-function SaveCredentials(data) {
+function SaveCredentials(data, additional) {
     var creds = new Object();
     creds['username'] = data['data']['nicename'] || "";
     creds['token'] = data['data']['token'] || "";
     creds['refresh_token'] = data['refresh_token'] || "";
+    if (additional) {
+        creds['additional'] = true;
+    }
 
     $.ajax({
         url: "api/plugin-apis/FPPMon/credentials",
@@ -149,7 +219,11 @@ function SaveCredentials(data) {
                 try { reply = JSON.parse(reply); } catch (e) { reply = {}; }
             }
             if (reply && reply['status'] == "error") {
-                $.jGrowl("FPPMon: the plugin rejected that request.");
+                $.jGrowl("FPPMon: " + (reply['message'] || "the plugin rejected that request."));
+                return;
+            }
+            if (additional) {
+                CheckStatus();
                 return;
             }
             // The plugin applies the new credentials as soon as this POST
@@ -263,6 +337,10 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
     <li class="nav-item" role="presentation">
         <a class="nav-link" id="fppmon-warnings-tab" data-bs-toggle="tab" data-bs-target="#fppmon-warnings"
            href="#fppmon-warnings" role="tab" aria-controls="fppmon-warnings" aria-selected="false">Warning Notifications</a>
+    </li>
+    <li class="nav-item" role="presentation" id="fppmonAccountsTabItem" style="display:none">
+        <a class="nav-link" id="fppmon-accounts-tab" data-bs-toggle="tab" data-bs-target="#fppmon-accounts"
+           href="#fppmon-accounts" role="tab" aria-controls="fppmon-accounts" aria-selected="false">Authorized Users</a>
     </li>
 </ul>
 <div class="tab-content">
@@ -485,6 +563,22 @@ FPPMonPrintIgnoreWarning("other", "All Others",
     "numbers this FPP does not list, and warnings from non-FPP controllers such as eFuse trips.");
 echo "</div>";
 ?>
+</div>
+</div>
+<div class="tab-pane fade" id="fppmon-accounts" role="tabpanel" aria-labelledby="fppmon-accounts-tab">
+<div class="container-fluid settingsTable settingsGroupTable">
+<div class="row"><div class="col-12">
+Someone else who should see this show in their own FPPMon app, such as the
+person who set it up, can be authorized here with their KulpLights account.
+Each authorized user needs their own FPPMon subscription.
+</div></div>
+<div id="additionalAccountList"></div>
+<div id="addAccountForm">
+<div class="row"><div class="col-12"><br><b>Add a user</b></div></div>
+<div class="row"><div class="printSettingLabelCol description col-auto">Username:</div><div class="col-auto"><input type='text' id='addusername'></div></div>
+<div class="row"><div class="printSettingLabelCol description col-auto">Password:</div><div class="col-auto"><input type='password' id='addpassword'></div></div>
+<div class="row"><div class="printSettingLabelCol description col-auto" style="visibility:hidden" aria-hidden="true">Username:</div><div class="col-auto"><input type='button' class='buttons buttons-rounded' value="Add User" onclick="AddAccount()"></div></div>
+</div>
 </div>
 </div>
 </div>
