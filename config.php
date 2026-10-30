@@ -87,6 +87,7 @@ function CheckStatus() {
                 // IgnoreWarning_ settings, so say so rather than offer
                 // checkboxes that do nothing.
                 $("#ignoreWarningsUnsupported").toggle(!data["ignoreWarnings"]);
+                $("#showNameUnsupported").toggle(!data["showName"]);
 
                 if (data["maxOther"] == 0) {
                     $(".otherControllerType").hide();
@@ -267,6 +268,16 @@ FPP Remote Monitoring Plugin Not Running.  Restart FPPD to enable.
 <div class="tab-content">
 <div class="tab-pane fade show active" id="fppmon-systems" role="tabpanel" aria-labelledby="fppmon-systems-tab">
 <div class="container-fluid settingsTable settingsGroupTable">
+    <div class="row"><div class="col-12">
+    <b>Show Name:</b>&nbsp;<? PrintSettingTextSaved("ShowName", 0, 0, 64, 32, "fpp-FPPMon", ""); ?>
+    <br>Optional. If one account monitors more than one show, name this one: the
+    FPPMon app can then show one show at a time, and its notifications start
+    with the name. Leave blank if you only have one show.
+    </div></div>
+    <div class="row" id="showNameUnsupported" style="display:none"><div class="col-12 text-danger">
+    The installed plugin binary does not support a show name yet. Update the plugin, then restart FPPD.
+    </div></div>
+    <div class="row"><br></div>
     <div class="row">Select FPP Instances and Controllers to Monitor:</div>
 <?
 // Via the web server's documented proxy, not fppd's internal port directly.
